@@ -1,3 +1,4 @@
 node_modules/
 src/program/target/
 src/program/test-ledger/
+.env

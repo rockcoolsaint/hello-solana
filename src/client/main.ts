@@ -9,6 +9,10 @@ import {
 } from '@solana/web3.js';
 import fs from 'mz/fs';
 import path from 'path';
+import dotenv from 'dotenv';
+
+// dot env config
+dotenv.config();
 
 /*
   Our keypair we used to create the on-chain Rust program
@@ -18,6 +22,25 @@ const PROGRAM_KEYPAIR_PATH = path.join(
   'hello_solana-keypair.json'
 );
 
+async function confirmWithRetry(connection: Connection, signature: string, retries = 5, delay = 2000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      console.log(`Checking transaction confirmation... Attempt ${i + 1}`);
+      const response = await connection.confirmTransaction(signature, "confirmed");
+      if (response.value.err === null) {
+        console.log("Transaction confirmed!");
+        return;
+      }
+    } catch (error) {
+      console.warn(`Retrying in ${delay}ms...`);
+      await new Promise(res => setTimeout(res, delay));
+      delay *= 2; // Exponential backoff
+    }
+  }
+  throw new Error(`Transaction ${signature} failed to confirm.`);
+}
+
+
 async function main() {
 
   console.log("Launching client...");
@@ -25,7 +48,8 @@ async function main() {
   /*
   Connect to Solana DEV net
   */
-  let connection = new Connection('https://api.devnet.solana.com', 'confirmed');
+  // let connection = new Connection('https://api.devnet.solana.com', 'confirmed');
+  let connection = new Connection(`https://solana-devnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY}`, 'confirmed');
 
   /*
   Get our program's public key
@@ -43,7 +67,7 @@ async function main() {
     triggerKeypair.publicKey,
     LAMPORTS_PER_SOL,
   );
-  await connection.confirmTransaction(airdropRequest);
+  await confirmWithRetry(connection, airdropRequest);
 
   /*
   Conduct a transaction with our program
