@@ -26,8 +26,8 @@ async function confirmWithRetry(connection: Connection, signature: string, retri
   for (let i = 0; i < retries; i++) {
     try {
       console.log(`Checking transaction confirmation... Attempt ${i + 1}`);
-      const response = await connection.confirmTransaction(signature, "confirmed");
-      if (response.value.err === null) {
+      const response = await connection.getSignatureStatus(signature, { searchTransactionHistory: true });
+      if (response?.value?.confirmationStatus === "finalized") {
         console.log("Transaction confirmed!");
         return;
       }
@@ -49,7 +49,7 @@ async function main() {
   Connect to Solana DEV net
   */
   // let connection = new Connection('https://api.devnet.solana.com', 'confirmed');
-  let connection = new Connection(`https://solana-devnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY}`, 'confirmed');
+  let connection = new Connection(`https://solana-devnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY}`, 'finalized');
 
   /*
   Get our program's public key
@@ -78,9 +78,27 @@ async function main() {
     programId,
     data: Buffer.alloc(0),
   });
+
+  // Fetch latest blockhash
+  const latestBlockhash = await connection.getLatestBlockhash();
+
+  // const transaction = new Transaction({
+  //   recentBlockhash: latestBlockhash.blockhash,
+  //   feePayer: triggerKeypair.publicKey,
+  // }).add(instruction);
+
+  const transaction = new Transaction().add(instruction);
+  transaction.feePayer = triggerKeypair.publicKey;
+  transaction.recentBlockhash = latestBlockhash.blockhash;
+  
+  // await sendAndConfirmTransaction(
+  //   connection,
+  //   new Transaction().add(instruction),
+  //   [triggerKeypair],
+  // );
   await sendAndConfirmTransaction(
     connection,
-    new Transaction().add(instruction),
+    transaction,
     [triggerKeypair],
   );
 }
